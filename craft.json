@@ -1,0 +1,20 @@
+{
+  "version": 5,
+  "name": "UltraSearch Pro CrossPlatform",
+  "request": "Recreate UltraSearch Pro - a fast file search application for Windows. Build a cross-platform version that works on both Windows and Linux with the same core features: fast file indexing, search syntax, and file preview.",
+  "target": {
+    "kind": "none"
+  },
+  "stack": "Rust + egui (eframe)",
+  "status": "needs_you",
+  "note": "Building UltraSearch Pro clone with cross-platform support (Windows + Linux) using Rust + egui/eframe. Goal: fast file search application with indexing and search syntax.",
+  "created_ms": 1795272000000,
+  "updated_ms": 1795272000000,
+  "checks": [],
+  "agent_session": null,
+  "capture_deep": false,
+  "allowed_actions": [],
+  "last_reply": "",
+  "asset_budget_usd": 5.0,
+  "generate_assets": false
+}
