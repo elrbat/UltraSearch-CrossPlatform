@@ -1,10 +1,20 @@
 [package]
 name = "ultra-search-crossplatform"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
+description = "Fast cross-platform file search"
+license = "GPL-3.0-only"
 
 [dependencies]
-eframe = "0.23.0"
+eframe = { version = "0.23.0", default-features = true }
 egui = "0.23.0"
-termion = "1.5.2"
+walkdir = "2.5"
 crossbeam-channel = "0.5"
+rfd = "0.12"
+open = "5.3"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
