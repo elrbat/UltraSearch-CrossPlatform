@@ -1,0 +1,38 @@
+app-id: io.github.elrbat.UltraSearch
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: ultrasearch
+finish-args:
+  - --share=ipc
+  - --socket=x11
+  - --socket=wayland
+  - --device=dri
+  # UltraSearch indexes user-selected locations, including mounted drives.
+  # This broad permission is required by the current implementation.
+  - --filesystem=host
+  # Allow opening files with the desktop's default application.
+  - --talk-name=org.freedesktop.FileManager1
+  - --talk-name=org.freedesktop.portal.Desktop
+modules:
+  - name: ultra-search-crossplatform
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/rust-stable/bin
+      env:
+        CARGO_HOME: /run/build/ultra-search-crossplatform/cargo
+        CARGO_NET_OFFLINE: 'true'
+    build-commands:
+      - cd app && cargo --offline fetch --verbose
+      - cd app && cargo build --offline --release
+      - install -D -m 0755 app/target/release/ultra-search-crossplatform /app/bin/ultrasearch
+      - install -D -m 0644 packaging/io.github.elrbat.UltraSearch.desktop /app/share/applications/io.github.elrbat.UltraSearch.desktop
+      - install -D -m 0644 packaging/io.github.elrbat.UltraSearch.svg /app/share/icons/hicolor/scalable/apps/io.github.elrbat.UltraSearch.svg
+      - install -D -m 0644 packaging/io.github.elrbat.UltraSearch.metainfo.xml /app/share/metainfo/io.github.elrbat.UltraSearch.metainfo.xml
+      - install -D -m 0644 LICENSE /app/share/licenses/io.github.elrbat.UltraSearch/LICENSE
+    sources:
+      - cargo-sources.json
+      - type: dir
+        path: .

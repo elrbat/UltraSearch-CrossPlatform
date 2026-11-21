@@ -1,0 +1,136 @@
+name: Build desktop apps
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            artifact: ultrasearch-linux-x86_64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: ultrasearch-windows-x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libxkbcommon-dev libwayland-dev libx11-dev libxcb1-dev libgl1-mesa-dev pkg-config
+      - name: Build release binary
+        working-directory: app
+        run: cargo build --release --target ${{ matrix.target }}
+      - name: Package Linux binary
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp app/target/${{ matrix.target }}/release/ultra-search-crossplatform dist/ultrasearch
+          chmod +x dist/ultrasearch
+          cp README.md dist/README.md
+          cp LICENSE dist/LICENSE
+          tar -C dist -czf ${{ matrix.artifact }}.tar.gz .
+          mkdir -p package/DEBIAN package/usr/bin package/usr/share/applications
+          install -m 0755 dist/ultrasearch package/usr/bin/ultrasearch
+          cat > package/DEBIAN/control <<'CONTROL'
+          Package: ultrasearch
+          Version: 0.2.0
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Maintainer: UltraSearch contributors
+          Description: Fast cross-platform file search
+           Desktop file search with folder indexing and query filters.
+          CONTROL
+          cat > package/usr/share/applications/ultrasearch.desktop <<'DESKTOP'
+          [Desktop Entry]
+          Name=UltraSearch
+          Comment=Fast file search
+          Exec=ultrasearch
+          Terminal=false
+          Type=Application
+          Categories=Utility;FileTools;
+          DESKTOP
+          mkdir -p package/usr/share/doc/ultrasearch
+          install -m 0644 LICENSE package/usr/share/doc/ultrasearch/copyright
+          dpkg-deb --build package ${{ matrix.artifact }}.deb
+      - name: Package Windows binary
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item app/target/${{ matrix.target }}/release/ultra-search-crossplatform.exe dist/UltraSearch.exe
+          Copy-Item README.md dist/README.md
+          Copy-Item LICENSE dist/LICENSE
+          Compress-Archive -Path dist/* -DestinationPath ${{ matrix.artifact }}.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}.*
+          if-no-files-found: error
+
+  build-flatpak:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Flatpak build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder python3-pip python3-venv
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+      - name: Generate locked Cargo dependency sources
+        run: |
+          cargo generate-lockfile --manifest-path app/Cargo.toml
+          python3 -m venv .venv-flatpak
+          . .venv-flatpak/bin/activate
+          pip install --upgrade pip aiohttp tomlkit pyyaml
+          curl -L https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/master/cargo/flatpak-cargo-generator.py -o flatpak-cargo-generator.py
+          python flatpak-cargo-generator.py app/Cargo.lock -o cargo-sources.json
+      - name: Install Flatpak SDK and Rust extension
+        run: |
+          flatpak install --user --noninteractive -y flathub \
+            org.freedesktop.Platform//24.08 \
+            org.freedesktop.Sdk//24.08 \
+            org.freedesktop.Sdk.Extension.rust-stable//24.08
+      - name: Build Flatpak bundle
+        run: |
+          flatpak-builder --user --force-clean --install-deps-from=flathub \
+            --repo=flatpak-repo flatpak-build io.github.elrbat.UltraSearch.yml
+          flatpak build-bundle flatpak-repo UltraSearch-x86_64.flatpak \
+            io.github.elrbat.UltraSearch --arch=x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ultrasearch-flatpak-x86_64
+          path: UltraSearch-x86_64.flatpak
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, build-flatpak]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          generate_release_notes: true

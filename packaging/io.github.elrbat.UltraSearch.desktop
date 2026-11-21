@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=UltraSearch
+GenericName=File Search
+Comment=Fast desktop file search and folder indexing
+Exec=ultrasearch
+Icon=io.github.elrbat.UltraSearch
+Terminal=false
+Type=Application
+Categories=Utility;FileTools;
+Keywords=search;files;folders;find;index;
+StartupNotify=true
